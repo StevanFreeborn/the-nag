@@ -63,7 +63,7 @@ internal sealed class Optimizer(
       ));
     }
 
-    await PersistResultsToDisk(currentPrompt, scenario.History);
+    await PersistResultsToDisk(optimalPrompt, scenario.History);
     return optimalPrompt;
   }
 
