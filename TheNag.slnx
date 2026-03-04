@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TheNag.Terminal/TheNag.Terminal.csproj" />
+  </Folder>
+</Solution>
