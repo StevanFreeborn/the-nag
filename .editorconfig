@@ -34,6 +34,11 @@ insert_final_newline = false
 #### .NET Coding Conventions ####
 [*.{cs,vb}]
 
+# Analyzer severity levels
+dotnet_diagnostic.IDE0100.severity = none
+dotnet_diagnostic.IDE0058.severity = none
+dotnet_diagnostic.CA1303.severity = none
+
 # Organize usings
 dotnet_separate_import_directive_groups = true
 dotnet_sort_system_directives_first = true
@@ -99,7 +104,7 @@ csharp_style_var_when_type_is_apparent = true:suggestion
 csharp_style_expression_bodied_accessors = true:silent
 csharp_style_expression_bodied_constructors = false:silent
 csharp_style_expression_bodied_indexers = true:silent
-csharp_style_expression_bodied_lambdas = true:suggestion
+csharp_style_expression_bodied_lambdas = when_on_single_line:suggestion
 csharp_style_expression_bodied_local_functions = false:silent
 csharp_style_expression_bodied_methods = false:silent
 csharp_style_expression_bodied_operators = false:silent
