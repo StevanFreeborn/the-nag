@@ -41,11 +41,6 @@ internal sealed class Optimizer(
       var eval = judge.Evaluate(aiOutput, scenario.GroundTruth);
       Console.WriteLine($"Score: {eval.FinalScore}%");
 
-      if (eval.FinalScore >= scenario.TargetScore)
-      {
-        return currentPrompt;
-      }
-
       if (eval.FinalScore > bestScore)
       {
         bestScore = eval.FinalScore;
