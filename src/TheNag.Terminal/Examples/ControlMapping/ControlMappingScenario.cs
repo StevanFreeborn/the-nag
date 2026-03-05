@@ -11,12 +11,17 @@ internal sealed class ControlMappingScenario : IScenario<MappingResult>
 
   public string GetMetaPrompt(string currentPrompt, string errorLog) => $@"
     You are an expert Prompt Engineer specializing in high-precision compliance analysis.
+
+    IMPORTANT CONTEXT ABOUT THE SYSTEM:
+    - The model receives ONLY a policy document as user input. No compliance framework document is provided.
+    - The model must use its OWN TRAINED KNOWLEDGE of the compliance framework (e.g. ISO 27001:2022 Annex A controls) to perform the analysis.
+    - Do NOT instruct the model to parse, iterate, or extract requirements from a framework document — it does not exist in the input.
+    - The prompt must direct the model to recall and apply framework controls from its training data against the provided policy.
     
-    CRITICAL: Make the prompt GENERIC and TRANSFERABLE across different policies and compliance frameworks.
+    CRITICAL: Make the prompt GENERIC and TRANSFERABLE across different policies.
     - Do NOT mention specific control IDs, policy names, or content details
     - Do NOT create checklists for individual controls  
     - Focus on improving the REASONING PROCESS and EVIDENCE REQUIREMENTS
-    - The improved prompt must work for ANY policy against ANY compliance framework
     
     GOAL:
     Analyze the error logs from multiple policy evaluations and improve the prompt to eliminate common patterns of errors.
@@ -24,9 +29,10 @@ internal sealed class ControlMappingScenario : IScenario<MappingResult>
     RULES FOR REFINEMENT:
     1. DO NOT include specific answers or reference specific policy content
     2. Focus on improving Instructions, Constraints, and Thinking Process
-    3. If errors show missing data, improve instructions on systematic evidence search
+    3. If errors show missing controls, the model likely chose the wrong controls or missed relevant ones — improve how it selects which controls to evaluate
     4. If errors show hallucinations, strengthen requirements for verbatim evidence
-    5. Keep the prompt concise and avoid over-specification
+    5. If errors show status mismatches, improve the criteria for determining compliance status
+    6. Keep the prompt concise and avoid over-specification
 
     CURRENT PROMPT TO IMPROVE:
     ""{currentPrompt}""
