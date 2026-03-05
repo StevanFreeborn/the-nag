@@ -19,7 +19,7 @@ internal sealed class App(
     var scenario = _configuration.GetValue<string>("scenario") ?? nameof(ControlMappingScenario);
     var optimizedPrompt = scenario switch
     {
-      nameof(ControlMappingScenario) => await _optimizer.RunAsync(ControlMappingScenario.New()),
+      nameof(ControlMappingScenario) => await _optimizer.RunAsync(ControlMappingScenario.New(), cancellationToken),
       _ => throw new InvalidOperationException($"Unknown scenario: {scenario}")
     };
 

@@ -9,7 +9,12 @@ internal sealed class GeminiService(IHttpClientFactory httpClientFactory, string
   private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
   private readonly string _apiKey = apiKey;
 
-  public async Task<string> GetStructuredResponseAsync(string prompt, string context, string schemaJson)
+  public async Task<string> GetStructuredResponseAsync(
+    string prompt,
+    string context,
+    string schemaJson,
+    CancellationToken cancellationToken = default
+  )
   {
     var request = new GeminiRequest
     {
@@ -26,11 +31,14 @@ internal sealed class GeminiService(IHttpClientFactory httpClientFactory, string
       }
     };
 
-    var response = await SendRequestAsync(request, "gemini-2.5-flash");
+    var response = await SendRequestAsync(request, "gemini-2.5-flash", cancellationToken);
     return ExtractTextFromResponse(response);
   }
 
-  public async Task<string> RefinePromptAsync(string metaPrompt)
+  public async Task<string> RefinePromptAsync(
+    string metaPrompt,
+    CancellationToken cancellationToken = default
+  )
   {
     var request = new GeminiRequest
     {
@@ -42,27 +50,32 @@ internal sealed class GeminiService(IHttpClientFactory httpClientFactory, string
       }
     };
 
-    var response = await SendRequestAsync(request, "gemini-2.5-pro");
+    var response = await SendRequestAsync(request, "gemini-2.5-pro", cancellationToken);
     return ExtractTextFromResponse(response);
   }
 
-  private async Task<GeminiResponse> SendRequestAsync(GeminiRequest request, string model)
+  private async Task<GeminiResponse> SendRequestAsync(
+    GeminiRequest request,
+    string model,
+    CancellationToken cancellationToken
+  )
   {
     using var client = _httpClientFactory.CreateClient();
     var jsonRequest = JsonSerializer.Serialize(request, JsonSerializerOptions);
     using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
     using var response = await client.PostAsync(
       new Uri($"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={_apiKey}"),
-      content
+      content,
+      cancellationToken
     );
 
     if (response.IsSuccessStatusCode is false)
     {
-      var errorContent = await response.Content.ReadAsStringAsync();
+      var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
       throw new HttpRequestException($"Gemini API Error ({model}): {response.StatusCode} - {errorContent}");
     }
 
-    var jsonResponse = await response.Content.ReadAsStringAsync();
+    var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
     return JsonSerializer.Deserialize<GeminiResponse>(jsonResponse, JsonSerializerOptions)
       ?? throw new JsonException($"Failed to deserialize response from {model}");
   }

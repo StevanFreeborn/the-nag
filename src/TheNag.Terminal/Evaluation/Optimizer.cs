@@ -20,7 +20,10 @@ internal sealed class Optimizer(
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
   };
 
-  public async Task<string> RunAsync<TResult>(IScenario<TResult> scenario)
+  public async Task<string> RunAsync<TResult>(
+    IScenario<TResult> scenario, 
+    CancellationToken cancellationToken = default
+  )
   {
     var judge = scenario.GetJudge();
     var currentPrompt = scenario.InitialPrompt;
@@ -32,12 +35,22 @@ internal sealed class Optimizer(
       Console.WriteLine($"\n=== Iteration {iteration} ===");
 
       Console.WriteLine("Training:");
-      var trainingResults = await EvaluateTestCasesAsync(currentPrompt, scenario.TrainingCases, judge);
+      var trainingResults = await EvaluateTestCasesAsync(
+        currentPrompt, 
+        scenario.TrainingCases, 
+        judge, 
+        cancellationToken
+      );
       var trainingScore = trainingResults.Average(r => r.Score);
       Console.WriteLine($"  Average: {trainingScore:F2}%");
 
       Console.WriteLine("\nValidation:");
-      var validationResults = await EvaluateTestCasesAsync(currentPrompt, scenario.ValidationCases, judge);
+      var validationResults = await EvaluateTestCasesAsync(
+        currentPrompt, 
+        scenario.ValidationCases, 
+        judge, 
+        cancellationToken
+      );
       var validationScore = validationResults.Average(r => r.Score);
       Console.WriteLine($"  Average: {validationScore:F2}%");
 
@@ -67,17 +80,18 @@ internal sealed class Optimizer(
       }
 
       var metaPrompt = scenario.GetMetaPrompt(currentPrompt, combinedErrorLog);
-      currentPrompt = await _gemini.RefinePromptAsync(metaPrompt);
+      currentPrompt = await _gemini.RefinePromptAsync(metaPrompt, cancellationToken);
     }
 
-    await PersistResultsToDisk(optimalPrompt, scenario);
+    await PersistResultsToDisk(optimalPrompt, scenario, cancellationToken);
     return optimalPrompt;
   }
 
   private async Task<IReadOnlyList<TestCaseResult<TResult>>> EvaluateTestCasesAsync<TResult>(
     string prompt,
     IReadOnlyList<ITestCase<TResult>> testCases,
-    IJudge<TResult> judge
+    IJudge<TResult> judge,
+    CancellationToken cancellationToken
   )
   {
     var results = new List<TestCaseResult<TResult>>();
@@ -89,7 +103,8 @@ internal sealed class Optimizer(
         var jsonResponse = await _gemini.GetStructuredResponseAsync(
           prompt,
           testCase.Context.ToContextString(),
-          judge.GetJsonSchema()
+          judge.GetJsonSchema(),
+          cancellationToken
         );
 
         var aiOutput = JsonSerializer.Deserialize<TResult>(jsonResponse);
@@ -132,7 +147,11 @@ internal sealed class Optimizer(
     return results;
   }
 
-  private async Task PersistResultsToDisk<TResult>(string finalPrompt, IScenario<TResult> scenario)
+  private async Task PersistResultsToDisk<TResult>(
+    string finalPrompt, 
+    IScenario<TResult> scenario, 
+    CancellationToken cancellationToken
+  )
   {
     if (scenario.History.Count == 0)
     {
@@ -243,7 +262,7 @@ internal sealed class Optimizer(
     }
 
     var filePath = _fileSystem.Path.Combine(directory, "report.md");
-    await _fileSystem.File.WriteAllTextAsync(filePath, sb.ToString());
+    await _fileSystem.File.WriteAllTextAsync(filePath, sb.ToString(), cancellationToken);
     Console.WriteLine($"\n[System] Session report persisted to: {filePath}");
   }
 }
