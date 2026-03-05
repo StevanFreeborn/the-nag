@@ -24,50 +24,111 @@ internal sealed class Optimizer(
   {
     var judge = scenario.GetJudge();
     var currentPrompt = scenario.InitialPrompt;
-    double bestScore = 0;
+    double bestTrainingScore = 0;
     var optimalPrompt = currentPrompt;
 
     foreach (var iteration in Enumerable.Range(1, scenario.MaxIterations))
     {
       Console.WriteLine($"--- Iteration {iteration} ---");
 
-      var jsonResponse = await _gemini.GetStructuredResponseAsync(currentPrompt, scenario.Context.ToContextString(), judge.GetJsonSchema());
-      var aiOutput = JsonSerializer.Deserialize<TResult>(jsonResponse);
+      var trainingResults = await EvaluateTestCasesAsync(currentPrompt, scenario.TrainingCases, judge, iteration);
+      var trainingScore = trainingResults.Average(r => r.Score);
+      Console.WriteLine($"Training Score: {trainingScore:F2}%");
 
-      if (aiOutput is null)
-      {
-        Console.WriteLine($"[Warning] Failed to parse AI output in iteration {iteration}. Skipping evaluation but continuing optimization.");
-        continue;
-      }
+      var validationResults = await EvaluateTestCasesAsync(currentPrompt, scenario.ValidationCases, judge, iteration);
+      var validationScore = validationResults.Average(r => r.Score);
+      Console.WriteLine($"Validation Score: {validationScore:F2}%");
 
-      var eval = judge.Evaluate(aiOutput, scenario.GroundTruth);
-      Console.WriteLine($"Score: {eval.FinalScore}%");
+      var combinedErrorLog = string.Join("\n\n", trainingResults
+        .Where(r => !string.IsNullOrEmpty(r.ErrorLog))
+        .Select(r => $"[{r.TestCaseName}]\n{r.ErrorLog}"));
 
       scenario.AddIteration(new(
         Number: iteration,
         Prompt: currentPrompt,
-        Score: eval.FinalScore,
-        ErrorLog: eval.DetailedErrorLog,
-        RawResponse: aiOutput
+        TrainingScore: trainingScore,
+        ValidationScore: validationScore,
+        ErrorLog: combinedErrorLog,
+        TrainingResults: trainingResults,
+        ValidationResults: validationResults
       ));
 
-      if (eval.FinalScore > bestScore)
+      if (trainingScore > bestTrainingScore)
       {
-        bestScore = eval.FinalScore;
+        bestTrainingScore = trainingScore;
         optimalPrompt = currentPrompt;
       }
 
-      if (eval.FinalScore >= scenario.TargetScore)
+      if (trainingScore >= scenario.TargetScore)
       {
         break;
       }
 
-      var metaPrompt = scenario.GetMetaPrompt(currentPrompt, eval.DetailedErrorLog);
+      var metaPrompt = scenario.GetMetaPrompt(currentPrompt, combinedErrorLog);
       currentPrompt = await _gemini.RefinePromptAsync(metaPrompt);
     }
 
     await PersistResultsToDisk(optimalPrompt, scenario);
     return optimalPrompt;
+  }
+
+  private async Task<IReadOnlyList<TestCaseResult<TResult>>> EvaluateTestCasesAsync<TResult>(
+    string prompt,
+    IReadOnlyList<ITestCase<TResult>> testCases,
+    IJudge<TResult> judge,
+    int iteration
+  )
+  {
+    var results = new List<TestCaseResult<TResult>>();
+
+    foreach (var testCase in testCases)
+    {
+      try
+      {
+        var jsonResponse = await _gemini.GetStructuredResponseAsync(
+          prompt,
+          testCase.Context.ToContextString(),
+          judge.GetJsonSchema()
+        );
+
+        var aiOutput = JsonSerializer.Deserialize<TResult>(jsonResponse);
+
+        if (aiOutput is null)
+        {
+          Console.WriteLine($"  [{testCase.Name}] Failed to parse AI output");
+          results.Add(new(
+            TestCaseName: testCase.Name,
+            Score: 0,
+            ErrorLog: "Failed to parse AI output",
+            RawResponse: default
+          ));
+          continue;
+        }
+
+        var eval = judge.Evaluate(aiOutput, testCase.GroundTruth);
+        Console.WriteLine($"  [{testCase.Name}] Score: {eval.FinalScore:F2}%");
+
+        results.Add(new(
+          TestCaseName: testCase.Name,
+          Score: eval.FinalScore,
+          ErrorLog: eval.DetailedErrorLog,
+          RawResponse: aiOutput
+        ));
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"  [{testCase.Name}] Error: {ex.Message}");
+
+        results.Add(new(
+          TestCaseName: testCase.Name,
+          Score: 0,
+          ErrorLog: $"Exception during evaluation: {ex.Message}",
+          RawResponse: default
+        ));
+      }
+    }
+
+    return results;
   }
 
   private async Task PersistResultsToDisk<TResult>(string finalPrompt, IScenario<TResult> scenario)
@@ -87,7 +148,10 @@ internal sealed class Optimizer(
     sb.AppendLine();
     sb.AppendLine(CultureInfo.InvariantCulture, $"- **Final Status**: {(scenario.IsSuccessful ? "Success" : "Incomplete")}");
     sb.AppendLine(CultureInfo.InvariantCulture, $"- **Total Iterations**: {scenario.History.Count}");
-    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Best Score Achieved**: {scenario.History.Max(i => i.Score)}%");
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Best Training Score**: {scenario.History.Max(i => i.TrainingScore):F2}%");
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Best Validation Score**: {scenario.History.Max(i => i.ValidationScore):F2}%");
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Training Cases**: {scenario.TrainingCases.Count}");
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Validation Cases**: {scenario.ValidationCases.Count}");
     sb.AppendLine();
 
     sb.AppendLine("## Final Optimized Prompt");
@@ -103,7 +167,8 @@ internal sealed class Optimizer(
     {
       sb.AppendLine(CultureInfo.InvariantCulture, $"## Iteration {iter.Number}");
       sb.AppendLine();
-      sb.AppendLine(CultureInfo.InvariantCulture, $"> **Score**: {iter.Score}%");
+      sb.AppendLine(CultureInfo.InvariantCulture, $"> **Training Score**: {iter.TrainingScore:F2}%  ");
+      sb.AppendLine(CultureInfo.InvariantCulture, $"> **Validation Score**: {iter.ValidationScore:F2}%");
       sb.AppendLine();
 
       sb.AppendLine("### Prompt Used");
@@ -113,20 +178,65 @@ internal sealed class Optimizer(
       sb.AppendLine("```");
       sb.AppendLine();
 
-      if (string.IsNullOrEmpty(iter.ErrorLog) is false)
+      sb.AppendLine("### Training Results");
+      sb.AppendLine();
+      foreach (var result in iter.TrainingResults)
       {
-        sb.AppendLine("### Issues Identified by Judge");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"#### {result.TestCaseName}");
         sb.AppendLine();
-        sb.AppendLine(iter.ErrorLog);
+        sb.AppendLine(CultureInfo.InvariantCulture, $"> **Score**: {result.Score:F2}%");
+        sb.AppendLine();
+
+        if (!string.IsNullOrEmpty(result.ErrorLog))
+        {
+          sb.AppendLine("**Issues:**");
+          sb.AppendLine();
+          sb.AppendLine(result.ErrorLog);
+          sb.AppendLine();
+        }
+
+        sb.AppendLine("<details>");
+        sb.AppendLine("<summary>Raw Response</summary>");
+        sb.AppendLine();
+        sb.AppendLine("```json");
+        sb.AppendLine(JsonSerializer.Serialize(result.RawResponse, JsonOptions));
+        sb.AppendLine("```");
+        sb.AppendLine();
+        sb.AppendLine("</details>");
         sb.AppendLine();
       }
 
-      sb.AppendLine("### Raw AI Response");
+      sb.AppendLine("### Validation Results");
       sb.AppendLine();
-      sb.AppendLine("```json");
-      sb.AppendLine(JsonSerializer.Serialize(iter.RawResponse, JsonOptions));
-      sb.AppendLine("```");
-      sb.AppendLine();
+      foreach (var result in iter.ValidationResults)
+      {
+        sb.AppendLine(CultureInfo.InvariantCulture, $"#### {result.TestCaseName}");
+        sb.AppendLine();
+        sb.AppendLine(CultureInfo.InvariantCulture, $"> **Score**: {result.Score:F2}%");
+        sb.AppendLine();
+
+        if (!string.IsNullOrEmpty(result.ErrorLog))
+        {
+          sb.AppendLine("<details>");
+          sb.AppendLine("<summary>Issues</summary>");
+          sb.AppendLine();
+          sb.AppendLine(result.ErrorLog);
+          sb.AppendLine();
+          sb.AppendLine("</details>");
+          sb.AppendLine();
+        }
+
+        sb.AppendLine("<details>");
+        sb.AppendLine("<summary>Raw Response</summary>");
+        sb.AppendLine();
+        sb.AppendLine("```json");
+        sb.AppendLine(JsonSerializer.Serialize(result.RawResponse, JsonOptions));
+        sb.AppendLine("```");
+        sb.AppendLine();
+        sb.AppendLine("</details>");
+        sb.AppendLine();
+      }
+
       sb.AppendLine("---");
       sb.AppendLine();
     }
