@@ -1,6 +1,6 @@
 # Control Mapping Example
 
-This example demonstrates using `The Nag` to optimize prompts for **compliance control mapping** - specifically, mapping an organization's access control policy to ISO 27001 controls.
+This example demonstrates using `The Nag` to optimize prompts for **compliance control mapping** — mapping an organization's policy documents to ISO 27001:2022 Annex A controls using a training/validation split.
 
 ## The Problem
 
@@ -17,10 +17,10 @@ This is tedious, requires domain expertise, and is prone to inconsistency. But w
 This example starts with an intentionally vague prompt:
 
 ```txt
-"yo heres a policy. I need to know if it helps me become iso compliant."
+"yo heres a policy. I need to know if it helps me become ISO 27001:2022 compliant."
 ```
 
-Then watches as TheNag iteratively refines it to produce more accurate control mappings.
+Then watches as The Nag iteratively refines it to produce more accurate control mappings. The AI receives only a policy document and must use its own trained knowledge of ISO 27001:2022 — no framework document is provided as input.
 
 ## The Domain Model
 
@@ -59,11 +59,13 @@ Evaluates AI output against the ground truth using a scoring rubric:
 - **3 points**: Provided a meaningful verbatim quote (>10 characters)
 - **0 points**: Control was not analyzed at all
 
-**Target score**: 95% (95 out of 100 points across 10 controls)
+**Target score**: 95%
 
-## Example Ground Truth
+## Test Cases
 
-The demo uses an Access Control Policy and evaluates against 10 ISO 27001 controls:
+Each test case has its own policy-specific ground truth — the expected controls are relevant to the content of that particular policy.
+
+### Training: Access Control Policy (10 controls)
 
 | Control | Status    | Section Referenced                            |
 |---------|-----------|-----------------------------------------------|
@@ -77,6 +79,19 @@ The demo uses an Access Control Policy and evaluates against 10 ISO 27001 contro
 | A.8.3   | Compliant | Least Privilege principle explicitly stated   |
 | A.8.5   | Compliant | MFA for remote/admin accounts                 |
 | A.8.10  | Gap       | No data/media deletion procedures             |
+
+### Validation: Encryption Policy (6 controls)
+
+| Control | Status    | Section Referenced                                  |
+|---------|-----------|-----------------------------------------------------|
+| A.5.14  | Compliant | TLS 1.2+ for external, IPsec for internal traffic   |
+| A.8.24  | Compliant | AES-256 encryption for all sensitive data            |
+| A.8.2   | Partial   | KMS access restricted, but no broader PAM controls   |
+| A.8.5   | Partial   | MFA for KMS access, but not system-wide              |
+| A.5.33  | Gap       | No records protection or retention rules             |
+| A.8.10  | Gap       | Covers encryption keys but not information deletion  |
+
+Training case error logs drive prompt refinement. Validation cases measure whether the improved prompt generalizes to unseen policies.
 
 ## What Gets Optimized?
 
@@ -100,9 +115,11 @@ The prompt refinement aims to teach the AI to:
 
 The example runs automatically when you start the application. It will:
 
-1. Load the Access Control Policy as context
+1. Load training and validation policies
 2. Start with the vague initial prompt
-3. Iterate up to 5 times or until 95% accuracy is achieved
-4. Output the optimized prompt and save a detailed session report
+3. Iterate up to 5 times or until 95% training accuracy is achieved
+4. At each iteration, evaluate both training and validation cases
+5. Use training error logs to refine the prompt via meta-prompt
+6. Output the optimized prompt and save a detailed session report
 
 Check `bin/Debug/net11.0/sessions/[timestamp]/report.md` to see how the prompt evolved.
