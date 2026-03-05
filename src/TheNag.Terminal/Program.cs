@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 
 using TheNag.Terminal;
 using TheNag.Terminal.Evaluation;
+using TheNag.Terminal.Evaluation.Gemini;
 
 await Host.CreateDefaultBuilder(args)
   .ConfigureAppConfiguration(

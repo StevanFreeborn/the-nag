@@ -7,6 +7,30 @@ internal sealed class ControlMappingScenario : IScenario<MappingResult>
   public string Name => nameof(ControlMappingScenario);
   public string InitialPrompt => "yo heres a policy. I need to know if it helps me become iso compliant.";
   public double TargetScore => 95.0;
+  public int MaxIterations => 5;
+
+  public string GetMetaPrompt(string currentPrompt, string errorLog) => $@"
+    You are an expert Prompt Engineer specializing in high-precision data extraction and analysis.
+    
+    GOAL:
+    Analyze the provided 'Error Log' and rewrite the 'Current Prompt' to eliminate these errors.
+    The rewritten prompt must be more effective, structured, and directive.
+
+    RULES FOR REFINEMENT:
+    1. DO NOT include the specific answers or 'Golden Key' data in the new prompt. 
+    2. Focus on improving the 'Instructions', 'Constraints', and 'Thinking Process' (e.g., Chain of Thought).
+    3. If the error log shows missing data, instruct the model to look specifically for those attributes.
+    4. If the error log shows hallucinations, add a constraint requiring verbatim evidence.
+    5. Maintain the same output schema requirements.
+
+    CURRENT PROMPT TO IMPROVE:
+    ""{currentPrompt}""
+
+    ERROR LOG FROM PREVIOUS RUN:
+    {errorLog}
+
+    Output ONLY the text of the new, improved prompt. Do not include any conversational filler.";
+
   public ITaskContext Context => new PolicyContext
   {
     PolicyName = "Access Control Policy: ACP-2026-v1",

@@ -3,6 +3,8 @@ using System.IO.Abstractions;
 using System.Text;
 using System.Text.Json;
 
+using TheNag.Terminal.Evaluation.Gemini;
+
 namespace TheNag.Terminal.Evaluation;
 
 internal sealed class Optimizer(
@@ -25,7 +27,7 @@ internal sealed class Optimizer(
     double bestScore = 0;
     var optimalPrompt = currentPrompt;
 
-    foreach (var iteration in Enumerable.Range(1, 5))
+    foreach (var iteration in Enumerable.Range(1, scenario.MaxIterations))
     {
       Console.WriteLine($"--- Iteration {iteration} ---");
 
@@ -34,26 +36,12 @@ internal sealed class Optimizer(
 
       if (aiOutput is null)
       {
-        Console.WriteLine("Failed to parse AI output. Skipping evaluation.");
+        Console.WriteLine($"[Warning] Failed to parse AI output in iteration {iteration}. Skipping evaluation but continuing optimization.");
         continue;
       }
 
       var eval = judge.Evaluate(aiOutput, scenario.GroundTruth);
       Console.WriteLine($"Score: {eval.FinalScore}%");
-
-      if (eval.FinalScore >= scenario.TargetScore)
-      {
-        await PersistResultsToDisk(currentPrompt, scenario.History);
-        return currentPrompt;
-      }
-
-      if (eval.FinalScore > bestScore)
-      {
-        bestScore = eval.FinalScore;
-        optimalPrompt = currentPrompt;
-      }
-
-      currentPrompt = await _gemini.RefinePromptAsync(currentPrompt, eval.DetailedErrorLog);
 
       scenario.AddIteration(new(
         Number: iteration,
@@ -62,21 +50,41 @@ internal sealed class Optimizer(
         ErrorLog: eval.DetailedErrorLog,
         RawResponse: aiOutput
       ));
+
+      if (eval.FinalScore > bestScore)
+      {
+        bestScore = eval.FinalScore;
+        optimalPrompt = currentPrompt;
+      }
+
+      if (eval.FinalScore >= scenario.TargetScore)
+      {
+        break;
+      }
+
+      var metaPrompt = scenario.GetMetaPrompt(currentPrompt, eval.DetailedErrorLog);
+      currentPrompt = await _gemini.RefinePromptAsync(metaPrompt);
     }
 
-    await PersistResultsToDisk(optimalPrompt, scenario.History);
+    await PersistResultsToDisk(optimalPrompt, scenario.History, scenario.TargetScore);
     return optimalPrompt;
   }
 
-  private async Task PersistResultsToDisk<TResult>(string finalPrompt, IReadOnlyList<Iteration<TResult>> history)
+  private async Task PersistResultsToDisk<TResult>(string finalPrompt, IReadOnlyList<Iteration<TResult>> history, double targetScore)
   {
-    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+    if (history.Count == 0)
+    {
+      Console.WriteLine("[Warning] No iterations to persist. Skipping report generation.");
+      return;
+    }
+
+    var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
     var directory = _fileSystem.Path.Combine(AppContext.BaseDirectory, "sessions", timestamp);
     _fileSystem.Directory.CreateDirectory(directory);
 
     var sb = new StringBuilder();
     sb.AppendLine(CultureInfo.InvariantCulture, $"# Optimization Session: {timestamp}");
-    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Final Status**: {(history[history.Count - 1].Score >= 95 ? "Success" : "Incomplete")}");
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Final Status**: {(history[history.Count - 1].Score >= targetScore ? "Success" : "Incomplete")}");
     sb.AppendLine(CultureInfo.InvariantCulture, $"- **Total Iterations**: {history.Count}");
     sb.AppendLine(CultureInfo.InvariantCulture, $"- **Best Score Achieved**: {history.Max(i => i.Score)}%");
     sb.AppendLine("\n## Final Optimized Prompt");
