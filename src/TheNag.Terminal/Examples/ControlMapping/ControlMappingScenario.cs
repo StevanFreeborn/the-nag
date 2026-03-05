@@ -5,7 +5,7 @@ namespace TheNag.Terminal.Examples.ControlMapping;
 internal sealed class ControlMappingScenario : IScenario<MappingResult>
 {
   public string Name => nameof(ControlMappingScenario);
-  public string InitialPrompt => "yo heres a policy. I need to know if it helps me become iso compliant.";
+  public string InitialPrompt => "yo heres a policy. I need to know if it helps me become ISO 27001:2022 compliant.";
   public double TargetScore => 95.0;
   public int MaxIterations => 5;
 
