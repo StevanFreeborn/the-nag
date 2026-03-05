@@ -66,13 +66,13 @@ internal sealed class Optimizer(
       currentPrompt = await _gemini.RefinePromptAsync(metaPrompt);
     }
 
-    await PersistResultsToDisk(optimalPrompt, scenario.History, scenario.TargetScore);
+    await PersistResultsToDisk(optimalPrompt, scenario);
     return optimalPrompt;
   }
 
-  private async Task PersistResultsToDisk<TResult>(string finalPrompt, IReadOnlyList<Iteration<TResult>> history, double targetScore)
+  private async Task PersistResultsToDisk<TResult>(string finalPrompt, IScenario<TResult> scenario)
   {
-    if (history.Count == 0)
+    if (scenario.History.Count == 0)
     {
       Console.WriteLine("[Warning] No iterations to persist. Skipping report generation.");
       return;
@@ -84,35 +84,51 @@ internal sealed class Optimizer(
 
     var sb = new StringBuilder();
     sb.AppendLine(CultureInfo.InvariantCulture, $"# Optimization Session: {timestamp}");
-    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Final Status**: {(history[history.Count - 1].Score >= targetScore ? "Success" : "Incomplete")}");
-    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Total Iterations**: {history.Count}");
-    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Best Score Achieved**: {history.Max(i => i.Score)}%");
-    sb.AppendLine("\n## Final Optimized Prompt");
+    sb.AppendLine();
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Final Status**: {(scenario.IsSuccessful ? "Success" : "Incomplete")}");
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Total Iterations**: {scenario.History.Count}");
+    sb.AppendLine(CultureInfo.InvariantCulture, $"- **Best Score Achieved**: {scenario.History.Max(i => i.Score)}%");
+    sb.AppendLine();
+
+    sb.AppendLine("## Final Optimized Prompt");
+    sb.AppendLine();
     sb.AppendLine("```text");
     sb.AppendLine(finalPrompt);
     sb.AppendLine("```");
-    sb.AppendLine("\n---\n");
+    sb.AppendLine();
+    sb.AppendLine("---");
+    sb.AppendLine();
 
-    foreach (var iter in history)
+    foreach (var iter in scenario.History)
     {
       sb.AppendLine(CultureInfo.InvariantCulture, $"## Iteration {iter.Number}");
+      sb.AppendLine();
       sb.AppendLine(CultureInfo.InvariantCulture, $"> **Score**: {iter.Score}%");
-      sb.AppendLine("\n### Prompt Used");
+      sb.AppendLine();
+
+      sb.AppendLine("### Prompt Used");
+      sb.AppendLine();
       sb.AppendLine("```text");
       sb.AppendLine(iter.Prompt);
       sb.AppendLine("```");
+      sb.AppendLine();
 
       if (string.IsNullOrEmpty(iter.ErrorLog) is false)
       {
-        sb.AppendLine("\n### Issues Identified by Judge");
+        sb.AppendLine("### Issues Identified by Judge");
+        sb.AppendLine();
         sb.AppendLine(iter.ErrorLog);
+        sb.AppendLine();
       }
 
-      sb.AppendLine("\n### Raw AI Response");
+      sb.AppendLine("### Raw AI Response");
+      sb.AppendLine();
       sb.AppendLine("```json");
       sb.AppendLine(JsonSerializer.Serialize(iter.RawResponse, JsonOptions));
       sb.AppendLine("```");
-      sb.AppendLine("\n---\n");
+      sb.AppendLine();
+      sb.AppendLine("---");
+      sb.AppendLine();
     }
 
     var filePath = _fileSystem.Path.Combine(directory, "report.md");

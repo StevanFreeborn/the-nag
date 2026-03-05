@@ -12,4 +12,6 @@ internal interface IScenario<TResult>
   string GetMetaPrompt(string currentPrompt, string errorLog);
   IReadOnlyList<Iteration<TResult>> History { get; }
   void AddIteration(Iteration<TResult> iteration);
+
+  bool IsSuccessful => History.Count > 0 && History[^1].Score >= TargetScore;
 }
