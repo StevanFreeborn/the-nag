@@ -97,11 +97,11 @@ Training case error logs drive prompt refinement. Validation cases measure wheth
 
 The prompt refinement aims to teach the AI to:
 
-- **Systematically analyze** each control rather than skipping some
-- **Correctly classify** compliance status based on policy content
-- **Provide evidence** by quoting directly from the source document
-- **Recognize gaps** when the policy is silent on a control
-- **Distinguish** between full compliance and partial coverage
+- Analyze each control rather than skipping some
+- Classify compliance status based on policy content
+- Provide evidence by quoting directly from the source document
+- Recognize gaps when the policy is silent on a control
+- Distinguish between full compliance and partial coverage
 
 ## Interesting Questions
 
