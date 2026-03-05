@@ -174,6 +174,13 @@ internal sealed class Optimizer(
     sb.AppendLine(CultureInfo.InvariantCulture, $"- **Validation Cases**: {scenario.ValidationCases.Count}");
     sb.AppendLine();
 
+    sb.AppendLine("## Initial Prompt");
+    sb.AppendLine();
+    sb.AppendLine("```text");
+    sb.AppendLine(scenario.InitialPrompt);
+    sb.AppendLine("```");
+    sb.AppendLine();
+
     sb.AppendLine("## Final Optimized Prompt");
     sb.AppendLine();
     sb.AppendLine("```text");

@@ -113,16 +113,12 @@ internal sealed class ControlMappingScenario : IScenario<MappingResult>
       groundTruth: new MappingResult
       {
         Evaluations = [
-          new() { ControlId = "A.5.15", Status = ComplianceStatus.Gap, Quote = "No mention. Policy does not address identity provisioning processes." },
-          new() { ControlId = "A.5.16", Status = ComplianceStatus.Gap, Quote = "No mention. Policy focuses on encryption, not identity lifecycle." },
-          new() { ControlId = "A.5.17", Status = ComplianceStatus.Partial, Quote = "Section 3.3: Requires MFA for KMS access, but no general authentication requirements." },
-          new() { ControlId = "A.5.18", Status = ComplianceStatus.Gap, Quote = "No mention. No access review procedures defined." },
-          new() { ControlId = "A.5.33", Status = ComplianceStatus.Gap, Quote = "No mention. No information records management addressed." },
-          new() { ControlId = "A.7.2", Status = ComplianceStatus.Gap, Quote = "No mention. Policy does not address HR screening." },
-          new() { ControlId = "A.8.2", Status = ComplianceStatus.Partial, Quote = "Section 3.3: Restricts KMS access to authorized personnel, but lacks broader privileged access controls." },
-          new() { ControlId = "A.8.3", Status = ComplianceStatus.Gap, Quote = "No mention. Least privilege principle not explicitly stated." },
-          new() { ControlId = "A.8.5", Status = ComplianceStatus.Partial, Quote = "Section 3.3: MFA required for KMS, but not mandated system-wide." },
-          new() { ControlId = "A.8.10", Status = ComplianceStatus.Gap, Quote = "No mention. Policy covers encryption keys but not general information deletion." }
+          new() { ControlId = "A.5.14", Status = ComplianceStatus.Compliant, Quote = "Section 3.2: TLS 1.2 or higher required for all external communications; IPsec for internal." },
+          new() { ControlId = "A.8.24", Status = ComplianceStatus.Compliant, Quote = "Section 3.1: All sensitive data must be encrypted using AES-256 or stronger." },
+          new() { ControlId = "A.8.2", Status = ComplianceStatus.Partial, Quote = "Section 3.3: Access to KMS restricted to authorized personnel, but no broader privileged access controls." },
+          new() { ControlId = "A.8.5", Status = ComplianceStatus.Partial, Quote = "Section 3.3: MFA required for KMS access, but not mandated system-wide." },
+          new() { ControlId = "A.5.33", Status = ComplianceStatus.Gap, Quote = "No mention. No information records protection or retention rules defined." },
+          new() { ControlId = "A.8.10", Status = ComplianceStatus.Gap, Quote = "No mention. Policy covers encryption keys but not information deletion." }
         ]
       }
     )
