@@ -29,15 +29,17 @@ internal sealed class Optimizer(
 
     foreach (var iteration in Enumerable.Range(1, scenario.MaxIterations))
     {
-      Console.WriteLine($"--- Iteration {iteration} ---");
+      Console.WriteLine($"\n=== Iteration {iteration} ===");
 
-      var trainingResults = await EvaluateTestCasesAsync(currentPrompt, scenario.TrainingCases, judge, iteration);
+      Console.WriteLine("Training:");
+      var trainingResults = await EvaluateTestCasesAsync(currentPrompt, scenario.TrainingCases, judge);
       var trainingScore = trainingResults.Average(r => r.Score);
-      Console.WriteLine($"Training Score: {trainingScore:F2}%");
+      Console.WriteLine($"  Average: {trainingScore:F2}%");
 
-      var validationResults = await EvaluateTestCasesAsync(currentPrompt, scenario.ValidationCases, judge, iteration);
+      Console.WriteLine("\nValidation:");
+      var validationResults = await EvaluateTestCasesAsync(currentPrompt, scenario.ValidationCases, judge);
       var validationScore = validationResults.Average(r => r.Score);
-      Console.WriteLine($"Validation Score: {validationScore:F2}%");
+      Console.WriteLine($"  Average: {validationScore:F2}%");
 
       var combinedErrorLog = string.Join("\n\n", trainingResults
         .Where(r => !string.IsNullOrEmpty(r.ErrorLog))
@@ -75,8 +77,7 @@ internal sealed class Optimizer(
   private async Task<IReadOnlyList<TestCaseResult<TResult>>> EvaluateTestCasesAsync<TResult>(
     string prompt,
     IReadOnlyList<ITestCase<TResult>> testCases,
-    IJudge<TResult> judge,
-    int iteration
+    IJudge<TResult> judge
   )
   {
     var results = new List<TestCaseResult<TResult>>();
@@ -95,7 +96,7 @@ internal sealed class Optimizer(
 
         if (aiOutput is null)
         {
-          Console.WriteLine($"  [{testCase.Name}] Failed to parse AI output");
+          Console.WriteLine($"  - {testCase.Name}: ERROR - Failed to parse AI output");
           results.Add(new(
             TestCaseName: testCase.Name,
             Score: 0,
@@ -106,7 +107,7 @@ internal sealed class Optimizer(
         }
 
         var eval = judge.Evaluate(aiOutput, testCase.GroundTruth);
-        Console.WriteLine($"  [{testCase.Name}] Score: {eval.FinalScore:F2}%");
+        Console.WriteLine($"  - {testCase.Name}: {eval.FinalScore:F2}%");
 
         results.Add(new(
           TestCaseName: testCase.Name,
@@ -117,7 +118,7 @@ internal sealed class Optimizer(
       }
       catch (Exception ex)
       {
-        Console.WriteLine($"  [{testCase.Name}] Error: {ex.Message}");
+        Console.WriteLine($"  - {testCase.Name}: ERROR - {ex.Message}");
 
         results.Add(new(
           TestCaseName: testCase.Name,
